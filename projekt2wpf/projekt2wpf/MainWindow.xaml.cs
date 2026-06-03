@@ -991,10 +991,10 @@ namespace projekt2wpf
         {
             var doc = new FlowDocument
             {
-                FontFamily = new FontFamily("Segoe UI"),
-                FontSize   = 14,
-                LineHeight = 22,
-                Padding    = new Thickness(20, 16, 20, 16)
+                FontFamily  = new FontFamily("Segoe UI"),
+                FontSize    = 14,
+                LineHeight  = 22,
+                PagePadding = new Thickness(20, 16, 20, 16)
             };
 
             if (!string.IsNullOrWhiteSpace(title))

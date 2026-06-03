@@ -67,15 +67,7 @@
                                FontSize="12" Foreground="White"
                                Background="{StaticResource AccentBrush}"
                                Padding="8,3" Margin="0,0,0,14"
-                               HorizontalAlignment="Left">
-                        <TextBlock.Style>
-                            <Style TargetType="TextBlock">
-                                <Style.Setters>
-                                    <Setter Property="TextBlock.TextDecorations" Value="{x:Null}"/>
-                                </Style.Setters>
-                            </Style>
-                        </TextBlock.Style>
-                    </TextBlock>
+                               HorizontalAlignment="Left"/>
 
                     <StackPanel Visibility="{Binding HasDescription, Converter={StaticResource BoolToVisibilityConverter}}"
                                 Margin="0,0,0,16">
