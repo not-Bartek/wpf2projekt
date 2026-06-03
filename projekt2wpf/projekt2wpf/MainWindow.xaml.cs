@@ -287,7 +287,10 @@ namespace projekt2wpf
             ClearFiltersCommand = new RelayCommand(ClearFilters, () => HasActiveFilters);
             OpenDetailCommand   = new RelayCommand<Book>(b => { if (b != null) _openDetail(b); });
 
-            _all.CollectionChanged += (_, _) => ApplyFilters();
+            _all.CollectionChanged += (_, _) =>
+                Application.Current.Dispatcher.BeginInvoke(
+                    System.Windows.Threading.DispatcherPriority.Background,
+                    new Action(ApplyFilters));
             ApplyFilters();
         }
 
@@ -766,20 +769,22 @@ namespace projekt2wpf
 
         private void NavigateToDetail(Book book)
         {
-            Application.Current.Dispatcher.BeginInvoke(new Action(() =>
-            {
-                CurrentPage = new BookDetailViewModel(
-                    book,
-                    GoToBookList,
-                    RequestEditBook,
-                    (b, fromStart) =>
-                    {
-                        if (string.IsNullOrEmpty(b.BookFilePath) || !File.Exists(b.BookFilePath)) return;
-                        if (fromStart) b.CurrentPage = 0;
-                        OpenReaderWindowRequested?.Invoke(
-                            new ReaderViewModel(b, () => { _repo.Save(); StatusMessage = "Reading position saved"; }));
-                    });
-            }));
+            Application.Current.Dispatcher.BeginInvoke(
+                System.Windows.Threading.DispatcherPriority.Background,
+                new Action(() =>
+                {
+                    CurrentPage = new BookDetailViewModel(
+                        book,
+                        GoToBookList,
+                        RequestEditBook,
+                        (b, fromStart) =>
+                        {
+                            if (string.IsNullOrEmpty(b.BookFilePath) || !File.Exists(b.BookFilePath)) return;
+                            if (fromStart) b.CurrentPage = 0;
+                            OpenReaderWindowRequested?.Invoke(
+                                new ReaderViewModel(b, () => { _repo.Save(); StatusMessage = "Reading position saved"; }));
+                        });
+                }));
         }
 
         private void RequestAddBook()
