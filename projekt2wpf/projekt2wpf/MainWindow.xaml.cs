@@ -1,4 +1,5 @@
 ﻿using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Globalization;
 using System.IO;
@@ -379,12 +380,29 @@ namespace projekt2wpf
 
             book.PropertyChanged += (_, e) =>
             {
-                if (e.PropertyName is nameof(Book.CurrentPage) or nameof(Book.BookFilePath))
+                switch (e.PropertyName)
                 {
-                    OnPropertyChanged(nameof(CanContinue));
-                    OnPropertyChanged(nameof(HasFile));
-                    OnPropertyChanged(nameof(ProgressPct));
-                    OnPropertyChanged(nameof(ProgressText));
+                    case nameof(Book.CurrentPage):
+                    case nameof(Book.BookFilePath):
+                        OnPropertyChanged(nameof(CanContinue));
+                        OnPropertyChanged(nameof(HasFile));
+                        OnPropertyChanged(nameof(ProgressPct));
+                        OnPropertyChanged(nameof(ProgressText));
+                        break;
+                    case nameof(Book.TotalPages):
+                        OnPropertyChanged(nameof(HasPages));
+                        OnPropertyChanged(nameof(ProgressPct));
+                        OnPropertyChanged(nameof(ProgressText));
+                        break;
+                    case nameof(Book.Description):
+                        OnPropertyChanged(nameof(HasDescription));
+                        break;
+                    case nameof(Book.Tags):
+                        OnPropertyChanged(nameof(HasTags));
+                        break;
+                    case nameof(Book.Status):
+                        OnPropertyChanged(nameof(StatusText));
+                        break;
                 }
             };
         }
@@ -751,16 +769,20 @@ namespace projekt2wpf
 
         private void NavigateToDetail(Book book)
         {
-            CurrentPage = new BookDetailViewModel(
-                book,
-                GoToBookList,
-                RequestEditBook,
-                (b, fromStart) =>
-                {
-                    if (fromStart) b.CurrentPage = 0;
-                    OpenReaderWindowRequested?.Invoke(
-                        new ReaderViewModel(b, () => { _repo.Save(); StatusMessage = "Reading position saved"; }));
-                });
+            Application.Current.Dispatcher.BeginInvoke(new Action(() =>
+            {
+                CurrentPage = new BookDetailViewModel(
+                    book,
+                    GoToBookList,
+                    RequestEditBook,
+                    (b, fromStart) =>
+                    {
+                        if (string.IsNullOrEmpty(b.BookFilePath) || !File.Exists(b.BookFilePath)) return;
+                        if (fromStart) b.CurrentPage = 0;
+                        OpenReaderWindowRequested?.Invoke(
+                            new ReaderViewModel(b, () => { _repo.Save(); StatusMessage = "Reading position saved"; }));
+                    });
+            }));
         }
 
         private void RequestAddBook()
@@ -897,15 +919,15 @@ namespace projekt2wpf
     {
         public static readonly DependencyProperty TagsProperty =
             DependencyProperty.Register(nameof(Tags), typeof(IEnumerable<string>), typeof(TagControl),
-                new PropertyMetadata(null));
+                new PropertyMetadata(null, OnTagsChanged));
 
         public static readonly DependencyProperty IsEditableProperty =
             DependencyProperty.Register(nameof(IsEditable), typeof(bool), typeof(TagControl),
-                new PropertyMetadata(false));
+                new PropertyMetadata(false, OnRebuildTrigger));
 
         public static readonly DependencyProperty RemoveTagCommandProperty =
             DependencyProperty.Register(nameof(RemoveTagCommand), typeof(ICommand), typeof(TagControl),
-                new PropertyMetadata(null));
+                new PropertyMetadata(null, OnRebuildTrigger));
 
         public IEnumerable<string>? Tags
         {
@@ -925,9 +947,77 @@ namespace projekt2wpf
             set => SetValue(RemoveTagCommandProperty, value);
         }
 
-        public TagControl()
+        public TagControl() => InitializeComponent();
+
+        private static void OnTagsChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
-            InitializeComponent();
+            var ctrl = (TagControl)d;
+            if (e.OldValue is INotifyCollectionChanged oldColl)
+                oldColl.CollectionChanged -= ctrl.OnCollectionChanged;
+            if (e.NewValue is INotifyCollectionChanged newColl)
+                newColl.CollectionChanged += ctrl.OnCollectionChanged;
+            ctrl.RebuildChips();
+        }
+
+        private static void OnRebuildTrigger(DependencyObject d, DependencyPropertyChangedEventArgs e)
+            => ((TagControl)d).RebuildChips();
+
+        private void OnCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+            => RebuildChips();
+
+        private void RebuildChips()
+        {
+            TagPanel.Children.Clear();
+            if (Tags == null) return;
+
+            var bg = Application.Current.Resources["PrimaryBrush"] as Brush ?? Brushes.DimGray;
+
+            foreach (var tag in Tags)
+            {
+                var panel = new StackPanel
+                {
+                    Orientation       = Orientation.Horizontal,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+
+                panel.Children.Add(new TextBlock
+                {
+                    Text              = tag,
+                    Foreground        = Brushes.White,
+                    FontSize          = 11,
+                    VerticalAlignment = VerticalAlignment.Center
+                });
+
+                if (IsEditable && RemoveTagCommand != null)
+                {
+                    var removeBtn = new Button
+                    {
+                        Content         = "×",
+                        FontSize        = 13,
+                        Width           = 18,
+                        Height          = 18,
+                        Padding         = new Thickness(0),
+                        Margin          = new Thickness(6, 0, 0, 0),
+                        Background      = Brushes.Transparent,
+                        BorderThickness = new Thickness(0),
+                        Foreground      = Brushes.White,
+                        Cursor          = Cursors.Hand,
+                        VerticalAlignment = VerticalAlignment.Center,
+                        Command         = RemoveTagCommand,
+                        CommandParameter = tag
+                    };
+                    panel.Children.Add(removeBtn);
+                }
+
+                TagPanel.Children.Add(new Border
+                {
+                    Background   = bg,
+                    CornerRadius = new CornerRadius(12),
+                    Margin       = new Thickness(3, 3, 0, 0),
+                    Padding      = new Thickness(9, 4, 9, 4),
+                    Child        = panel
+                });
+            }
         }
     }
 
